@@ -762,7 +762,7 @@ def async_setup_scanner_platform(hass: HomeAssistantType, config: ConfigType,
                 'host_name': host_name,
                 'source_type': SOURCE_TYPE_ROUTER,
                 'attributes': {
-                    'scanner': scanner.__class__.__name__
+                    'scanner': scanner.__class__.__name__,
                     **extra_attributes
                 }
             }
