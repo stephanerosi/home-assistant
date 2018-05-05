@@ -463,6 +463,9 @@ insteonplm==0.11.7
 # homeassistant.components.sensor.iperf3
 iperf3==0.1.10
 
+# homeassistant.components.media_player.webostv
+jellyfish==0.6.1
+
 # homeassistant.components.verisure
 jsonpath==0.75
 
