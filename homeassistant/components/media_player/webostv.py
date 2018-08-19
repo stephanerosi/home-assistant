@@ -176,11 +176,15 @@ class LgWebOSDevice(MediaPlayerDevice):
         self._app_list = {}
         self._channel = None
         self._channel_list = {}
+        self._change_in_progress = False
 
     @util.Throttle(MIN_TIME_BETWEEN_SCANS, MIN_TIME_BETWEEN_FORCED_SCANS)
     def update(self):
         """Retrieve the latest data."""
-        _LOGGER.debug("Executing update() function...")
+        if self._change_in_progress:
+            _LOGGER.debug("Change in progress : waiting before updating")
+            return
+
         from websockets.exceptions import ConnectionClosed
         try:
             current_input = self._client.get_input()
@@ -267,7 +271,6 @@ class LgWebOSDevice(MediaPlayerDevice):
     @property
     def source(self):
         """Return the current input source."""
-        _LOGGER.debug("Executing source() function : %s...", self._current_source)
         return self._current_source
 
     @property
@@ -364,9 +367,12 @@ class LgWebOSDevice(MediaPlayerDevice):
         elif source_dict.get('label'):
             self._current_source = source_dict['label']
             self._client.set_input(source_dict['id'])
-        #self._channel = None
-        #time.sleep(5)
-        #self.schedule_update_ha_state()
+
+        # Changing source takes time...
+        self._change_in_progress = True
+        self._channel = None
+        time.sleep(2)
+        self._change_in_progress = False
 
     def play_media(self, media_type, media_id, **kwargs):
         """Play a piece of media."""
