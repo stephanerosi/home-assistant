@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from typing import Dict  # noqa: F401
 
 import voluptuous as vol
+import time
 
 from homeassistant.components.media_player import (
     MEDIA_TYPE_CHANNEL, PLATFORM_SCHEMA, SUPPORT_NEXT_TRACK, SUPPORT_PAUSE,
@@ -179,6 +180,7 @@ class LgWebOSDevice(MediaPlayerDevice):
     @util.Throttle(MIN_TIME_BETWEEN_SCANS, MIN_TIME_BETWEEN_FORCED_SCANS)
     def update(self):
         """Retrieve the latest data."""
+        _LOGGER.debug("Executing update() function...")
         from websockets.exceptions import ConnectionClosed
         try:
             current_input = self._client.get_input()
@@ -195,7 +197,12 @@ class LgWebOSDevice(MediaPlayerDevice):
             if self._state is not STATE_OFF:
                 self._muted = self._client.get_muted()
                 self._volume = self._client.get_volume()
-                self._channel = self._client.get_current_channel()
+                
+                current_channel = self._client.get_current_channel()
+                if 'channelName' in current_channel:
+                    self._channel = current_channel['channelName']
+                else:
+                    self._channel = None
 
                 self._source_list = {}
                 self._app_list = {}
@@ -260,6 +267,7 @@ class LgWebOSDevice(MediaPlayerDevice):
     @property
     def source(self):
         """Return the current input source."""
+        _LOGGER.debug("Executing source() function : %s...", self._current_source)
         return self._current_source
 
     @property
@@ -275,15 +283,15 @@ class LgWebOSDevice(MediaPlayerDevice):
     @property
     def media_content_type(self):
         """Content type of current playing media."""
-        if (self._channel is not None) and ('channelName' in self._channel):
+        if (self._channel is not None):
             return MEDIA_TYPE_CHANNEL
         return None
 
     @property
     def media_title(self):
         """Title of current playing media."""
-        if (self._channel is not None) and ('channelName' in self._channel):
-            return self._channel['channelName']
+        if (self._channel is not None):
+            return self._channel
         return None
 
     @property
@@ -356,8 +364,9 @@ class LgWebOSDevice(MediaPlayerDevice):
         elif source_dict.get('label'):
             self._current_source = source_dict['label']
             self._client.set_input(source_dict['id'])
-        self._channel = None
-        self.schedule_update_ha_state()
+        #self._channel = None
+        #time.sleep(5)
+        #self.schedule_update_ha_state()
 
     def play_media(self, media_type, media_id, **kwargs):
         """Play a piece of media."""
@@ -368,14 +377,16 @@ class LgWebOSDevice(MediaPlayerDevice):
             _LOGGER.debug("Searching channel...")
             partial_match_channel_id = None
             perfect_match_channel_id = None
+            match_channel = None
 
             for channel in self._client.get_channels():
+                match_channel = channel['channelName']
                 if media_id == channel['channelNumber']:
                     perfect_match_channel_id = channel['channelId']
-                    continue
+                    break
                 elif media_id.lower() == channel['channelName'].lower():
                     perfect_match_channel_id = channel['channelId']
-                    continue
+                    break
                 elif media_id.lower() in channel['channelName'].lower():
                     partial_match_channel_id = channel['channelId']
 
@@ -383,13 +394,15 @@ class LgWebOSDevice(MediaPlayerDevice):
                 _LOGGER.info(
                     "Switching to channel <%s> with perfect match",
                     perfect_match_channel_id)
+                self._channel = match_channel
                 self._client.set_channel(perfect_match_channel_id)
             elif partial_match_channel_id is not None:
                 _LOGGER.info(
                     "Switching to channel <%s> with partial match",
                     partial_match_channel_id)
+                self._channel = match_channel
                 self._client.set_channel(partial_match_channel_id)
-
+           
             return
 
     def media_play(self):
